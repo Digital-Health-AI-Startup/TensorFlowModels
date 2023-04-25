@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """A common dataset reader."""
+import dataclasses
 import random
 from typing import Any, Callable, Dict, List, Optional, Sequence, Text, Union
 
@@ -159,18 +160,23 @@ def _read_tfds(tfds_name: Text,
                cycle_length: Optional[int] = None,
                block_length: Optional[int] = None) -> tf.data.Dataset:
   """Reads a dataset from tfds."""
+  repeat_filenames = is_training and not cache
+  read_config = tfds.ReadConfig(
+      interleave_cycle_length=cycle_length,
+      interleave_block_length=block_length,
+      input_context=input_context,
+      shuffle_seed=seed,
+      repeat_filenames=repeat_filenames,
+      # Only assert cardinality when we have a finite dataset.
+      assert_cardinality=not repeat_filenames,
+      skip_prefetch=True)
+
   decoders = {}
   if tfds_skip_decoding_feature:
     for skip_feature in tfds_skip_decoding_feature.split(','):
       decoders[skip_feature.strip()] = tfds.decode.SkipDecoding()
 
   if tfds_name.startswith('mldataset.'):
-    read_config = tfds.ReadConfig(
-        interleave_cycle_length=cycle_length,
-        interleave_block_length=block_length,
-        input_context=input_context,
-        shuffle_seed=seed,
-        skip_prefetch=True)
     dataset = tfds.load(name=tfds_name,
                         split=tfds_split,
                         as_supervised=tfds_as_supervised,
@@ -194,28 +200,14 @@ def _read_tfds(tfds_name: Text,
       # The number of files in the dataset split is smaller than the number of
       # input pipelines. We read the entire dataset first and then shard in the
       # host memory.
-      read_config = tfds.ReadConfig(
-          interleave_cycle_length=cycle_length,
-          interleave_block_length=block_length,
-          input_context=None,
-          shuffle_seed=seed,
-          skip_prefetch=True)
+      read_config = dataclasses.replace(read_config, input_context=None)
       load_kwargs.update({'read_config': read_config})
       dataset = tfds.load(**load_kwargs)
       dataset = dataset.shard(input_context.num_input_pipelines,
                               input_context.input_pipeline_id)
     else:
-      read_config = tfds.ReadConfig(
-          interleave_cycle_length=cycle_length,
-          interleave_block_length=block_length,
-          input_context=input_context,
-          shuffle_seed=seed,
-          skip_prefetch=True)
       load_kwargs.update({'read_config': read_config})
       dataset = tfds.load(**load_kwargs)
-
-  if is_training and not cache:
-    dataset = dataset.repeat()
   return dataset
 
 
@@ -226,17 +218,23 @@ class InputReader:
   # instances.
   static_randnum = _get_random_integer()
 
-  def __init__(self,
-               params: cfg.DataConfig,
-               dataset_fn=tf.data.TFRecordDataset,
-               decoder_fn: Optional[Callable[..., Any]] = None,
-               combine_fn: Optional[Callable[..., Any]] = None,
-               sample_fn: Optional[Callable[..., Any]] = None,
-               parser_fn: Optional[Callable[..., Any]] = None,
-               transform_and_batch_fn: Optional[Callable[
-                   [tf.data.Dataset, Optional[tf.distribute.InputContext]],
-                   tf.data.Dataset]] = None,
-               postprocess_fn: Optional[Callable[..., Any]] = None):
+  def __init__(
+      self,
+      params: cfg.DataConfig,
+      dataset_fn=tf.data.TFRecordDataset,
+      decoder_fn: Optional[Callable[..., Any]] = None,
+      combine_fn: Optional[Callable[..., Any]] = None,
+      sample_fn: Optional[Callable[..., Any]] = None,
+      parser_fn: Optional[Callable[..., Any]] = None,
+      filter_fn: Optional[Callable[..., tf.Tensor]] = None,
+      transform_and_batch_fn: Optional[
+          Callable[
+              [tf.data.Dataset, Optional[tf.distribute.InputContext]],
+              tf.data.Dataset,
+          ]
+      ] = None,
+      postprocess_fn: Optional[Callable[..., Any]] = None,
+  ):
     """Initializes an InputReader instance.
 
     Args:
@@ -254,6 +252,8 @@ class InputReader:
       parser_fn: An optional `callable` that takes the decoded raw tensors dict
         and parse them into a dictionary of tensors that can be consumed by the
         model. It will be executed after decoder_fn.
+      filter_fn: An optional `callable` mapping a dataset element to a boolean.
+        It will be executed after parser_fn.
       transform_and_batch_fn: An optional `callable` that takes a
         `tf.data.Dataset` object and an optional `tf.distribute.InputContext` as
         input, and returns a `tf.data.Dataset` object. It will be executed after
@@ -306,9 +306,11 @@ class InputReader:
     self._parser_fn = parser_fn
     self._transform_and_batch_fn = transform_and_batch_fn
     self._postprocess_fn = postprocess_fn
+    self._filter_fn = filter_fn
     self._seed = params.seed
     self._prefetch_buffer_size = (
         params.prefetch_buffer_size or tf.data.experimental.AUTOTUNE)
+    self._autotune_algorithm = params.autotune_algorithm
 
     # When tf.data service is enabled, each data service worker should get
     # different random seeds. Thus, we set `seed` to None.
@@ -378,10 +380,14 @@ class InputReader:
       if len(files) > 1:
         if input_context and (len(files) < input_context.num_input_pipelines):
           logging.warn(
-              'The number of files %d is less than the number of input pipelines '
-              '%d. We will send all input files to every worker. '
-              'Please consider sharding your data into more files.', len(files),
-              input_context.num_input_pipelines)
+              (
+                  'The number of files %d is less than the number of input '
+                  'pipelines %d. We will send all input files to every worker. '
+                  'Please consider sharding your data into more files.'
+              ),
+              len(files),
+              input_context.num_input_pipelines,
+          )
           return _read_files_then_shard(
               files,
               dataset_fn,
@@ -474,6 +480,9 @@ class InputReader:
     if self._sample_fn is not None:
       dataset = dataset.apply(self._sample_fn)
     dataset = _maybe_map_fn(dataset, self._parser_fn)
+
+    if self._filter_fn is not None:
+      dataset = dataset.filter(self._filter_fn)
 
     if self._cache:
       dataset = dataset.cache()
@@ -573,5 +582,10 @@ class InputReader:
     if self._deterministic is not None:
       options = tf.data.Options()
       options.deterministic = self._deterministic
+      dataset = dataset.with_options(options)
+    if self._autotune_algorithm:
+      options = tf.data.Options()
+      options.autotune.autotune_algorithm = (
+          tf.data.experimental.AutotuneAlgorithm[self._autotune_algorithm])
       dataset = dataset.with_options(options)
     return dataset.prefetch(self._prefetch_buffer_size)

@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -146,11 +146,14 @@ class YoloDetectionGenerator(hyperparams.Config):
       default_factory=_build_dict(MIN_LEVEL, MAX_LEVEL, 1.0))
   path_scales: FPNConfig = dataclasses.field(
       default_factory=_build_path_scales(MIN_LEVEL, MAX_LEVEL))
-  nms_type: str = 'greedy'
+  # Choose from v1, v2, iou and greedy.
+  nms_version: str = 'greedy'
   iou_thresh: float = 0.001
   nms_thresh: float = 0.6
   max_boxes: int = 200
   pre_nms_points: int = 5000
+  # Only works when nms_version='v2'.
+  use_class_agnostic_nms: Optional[bool] = False
 
 
 @dataclasses.dataclass

@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -217,9 +217,20 @@ class AnchorLabeler(object):
         att_mask = tf.tile(cls_mask, [1, att_size])
         att_targets[k] = self.target_gather(v, match_indices, att_mask, 0.0)
 
-    weights = tf.squeeze(tf.ones_like(gt_labels, dtype=tf.float32), -1)
+    # When there is no ground truth labels, we force the weight to be 1 so that
+    # negative matched anchors get non-zero weights.
+    num_gt_labels = tf.shape(gt_labels)[0]
+    weights = tf.cond(
+        tf.greater(num_gt_labels, 0),
+        lambda: tf.squeeze(tf.ones_like(gt_labels, dtype=tf.float32), -1),
+        lambda: tf.ones([1], dtype=tf.float32),
+    )
     if gt_weights is not None:
-      weights = tf.math.multiply(weights, gt_weights)
+      weights = tf.cond(
+          tf.greater(num_gt_labels, 0),
+          lambda: tf.math.multiply(weights, gt_weights),
+          lambda: weights,
+      )
     box_weights = self.target_gather(weights, match_indices, mask)
     ignore_mask = tf.equal(match_indicators, -2)
     cls_weights = self.target_gather(weights, match_indices, ignore_mask)

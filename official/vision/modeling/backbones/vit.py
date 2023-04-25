@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ class AddPositionEmbs(layers.Layer):
                posemb_origin_shape: Optional[Tuple[int, int]] = None,
                posemb_target_shape: Optional[Tuple[int, int]] = None,
                **kwargs):
-    """Constructs Postional Embedding module.
+    """Constructs Positional Embedding module.
 
     The logic of this module is: the learnable positional embeddings length will
     be determined by the inputs_shape or posemb_origin_shape (if provided)

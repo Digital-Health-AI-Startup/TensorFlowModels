@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ def sample_random_sequence(model_input, num_frames, num_samples):
   max_start_frame_index = tf.maximum(num_frames - num_samples, 0)
   start_frame_index = tf.cast(
       tf.multiply(
-          tf.random_uniform([batch_size, 1]),
+          tf.random.uniform([batch_size, 1]),
           tf.cast(max_start_frame_index + 1, tf.float32)), tf.int32)
   frame_index = tf.minimum(start_frame_index + frame_index_offset,
                            tf.cast(num_frames - 1, tf.int32))

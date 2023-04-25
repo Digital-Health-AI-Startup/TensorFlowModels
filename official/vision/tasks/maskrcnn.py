@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -92,6 +92,11 @@ class MaskRCNNTask(base_task.Task):
     if self.task_config.freeze_backbone:
       model.backbone.trainable = False
 
+    # Builds the model through warm-up call.
+    dummy_images = tf.keras.Input(self.task_config.model.input_size)
+    dummy_image_shape = tf.keras.layers.Input([2])
+    _ = model(dummy_images, image_shape=dummy_image_shape, training=False)
+
     return model
 
   def initialize(self, model: tf.keras.Model):
@@ -106,7 +111,7 @@ class MaskRCNNTask(base_task.Task):
 
     # Restoring checkpoint.
     if self.task_config.init_checkpoint_modules == 'all':
-      ckpt = tf.train.Checkpoint(**model.checkpoint_items)
+      ckpt = tf.train.Checkpoint(model=model)
       status = ckpt.read(ckpt_dir_or_file)
       status.expect_partial().assert_existing_objects_matched()
     else:
@@ -488,7 +493,6 @@ class MaskRCNNTask(base_task.Task):
       A dictionary of logs.
     """
     images, labels = inputs
-
     outputs = model(
         images,
         anchor_boxes=labels['anchor_boxes'],

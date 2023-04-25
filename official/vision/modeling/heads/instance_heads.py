@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -120,13 +120,12 @@ class DetectionHead(tf.keras.layers.Layer):
           'kernel_regularizer': self._config_dict['kernel_regularizer'],
           'bias_regularizer': self._config_dict['bias_regularizer'],
       })
-    bn_op = (tf.keras.layers.experimental.SyncBatchNormalization
-             if self._config_dict['use_sync_bn']
-             else tf.keras.layers.BatchNormalization)
+    bn_op = tf.keras.layers.BatchNormalization
     bn_kwargs = {
         'axis': self._bn_axis,
         'momentum': self._config_dict['norm_momentum'],
         'epsilon': self._config_dict['norm_epsilon'],
+        'synchronized': self._config_dict['use_sync_bn'],
     }
 
     self._convs = []
@@ -314,13 +313,12 @@ class MaskHead(tf.keras.layers.Layer):
           'kernel_regularizer': self._config_dict['kernel_regularizer'],
           'bias_regularizer': self._config_dict['bias_regularizer'],
       })
-    bn_op = (tf.keras.layers.experimental.SyncBatchNormalization
-             if self._config_dict['use_sync_bn']
-             else tf.keras.layers.BatchNormalization)
+    bn_op = tf.keras.layers.BatchNormalization
     bn_kwargs = {
         'axis': self._bn_axis,
         'momentum': self._config_dict['norm_momentum'],
         'epsilon': self._config_dict['norm_epsilon'],
+        'synchronized': self._config_dict['use_sync_bn'],
     }
 
     self._convs = []

@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1785,6 +1785,12 @@ class SPPCSPC(tf.keras.layers.Layer):
         activation=self._activation,
         kernel_initializer=self._kernel_initializer,
         kernel_regularizer=self._kernel_regularizer,
+        bias_initializer=self._bias_initializer,
+        bias_regularizer=self._bias_regularizer,
+        use_bn=self._use_bn,
+        use_sync_bn=self._use_sync_bn,
+        norm_momentum=self._norm_momentum,
+        norm_epsilon=self._norm_epsilon,
     )
     self._conv1_1 = conv_op(filters, kernel_size=1, strides=1)
     self._conv1_2 = conv_op(filters, kernel_size=3, strides=1)
@@ -1903,7 +1909,6 @@ class RepConv(tf.keras.layers.Layer):
         filters=self._filters,
         strides=self._strides,
         padding=self._padding,
-        activation=self._activation,
         kernel_initializer=self._kernel_initializer,
         kernel_regularizer=self._kernel_regularizer,
         bias_initializer=self._bias_initializer,

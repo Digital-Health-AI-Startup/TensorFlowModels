@@ -1,4 +1,4 @@
-# Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -97,10 +97,7 @@ class FPN(tf.keras.Model):
       conv2d = tf.keras.layers.SeparableConv2D
     else:
       conv2d = tf.keras.layers.Conv2D
-    if use_sync_bn:
-      norm = tf.keras.layers.experimental.SyncBatchNormalization
-    else:
-      norm = tf.keras.layers.BatchNormalization
+    norm = tf.keras.layers.BatchNormalization
     activation_fn = tf_utils.get_activation(activation, use_keras_layer=True)
 
     # Build input feature pyramid.
@@ -185,6 +182,7 @@ class FPN(tf.keras.Model):
           axis=bn_axis,
           momentum=norm_momentum,
           epsilon=norm_epsilon,
+          synchronized=use_sync_bn,
           name=f'norm_{level}')(
               feats[str(level)])
 
