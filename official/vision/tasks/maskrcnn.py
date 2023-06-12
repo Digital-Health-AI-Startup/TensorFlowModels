@@ -150,7 +150,7 @@ class MaskRCNNTask(base_task.Task):
           mask_binarize_threshold=decoder_cfg.mask_binarize_threshold)
     elif params.decoder.type == 'via_decoder':
       decoder = via_decoder.ViaDecoder(
-          annotations_json_path=params.input_path,
+          data_subset_dir=os.path.split(params.input_path)[0],
           class_names=decoder_cfg.class_names,
           include_mask=self._task_config.model.include_mask,
           preprocess=decoder_cfg.preprocess)

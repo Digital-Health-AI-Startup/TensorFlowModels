@@ -19,7 +19,6 @@ protos for object detection.
 """
 import json
 import os
-
 import numpy as np
 import tensorflow as tf
 from official.vision.dataloaders import decoder
@@ -35,13 +34,14 @@ def _generate_source_id(image_bytes):
 
 
 class ViaDecoder(decoder.Decoder):
-  def __init__(self, annotations_json_path, class_names, include_mask=False, preprocess=True):
+  def __init__(self, data_subset_dir, class_names, include_mask=False, preprocess=True):
+    annotations_json_path = os.path.join(data_subset_dir, 'annotations.json')
     with open(annotations_json_path, 'r') as f:
         self._annotations = json.load(f)
     self._image_dir = os.path.split(annotations_json_path)[0]
     self._class_names = class_names
     self._include_mask = include_mask
-    self._keys_to_features = {'image_filename': tf.io.FixedLenFeature((), tf.string)}
+    self._keys_to_features = {'image/key': tf.io.FixedLenFeature((), tf.string)}
     self._preprocess = preprocess
     if self._preprocess:
         self._preprocessor = common.Preprocessor()
