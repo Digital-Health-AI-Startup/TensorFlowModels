@@ -41,10 +41,8 @@ class TfExampleDecoderLabelMap(hyperparams.Config):
 
 @dataclasses.dataclass
 class ViaDecoder(hyperparams.Config):
-  """A simple TF Example decoder config."""
-  regenerate_source_id: bool = False
-  mask_binarize_threshold: Optional[float] = None
-  attribute_names: List[str] = dataclasses.field(default_factory=list)
+  class_names: [str] = None,
+  preprocess: bool = True
 
 
 @dataclasses.dataclass
