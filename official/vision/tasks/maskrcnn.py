@@ -31,12 +31,12 @@ from official.vision.dataloaders import input_reader_factory
 from official.vision.dataloaders import maskrcnn_input
 from official.vision.dataloaders import tf_example_decoder
 from official.vision.dataloaders import tf_example_label_map_decoder
-from official.vision.dataloaders import via_decoder
 from official.vision.evaluation import coco_evaluator
 from official.vision.evaluation import coco_utils
 from official.vision.evaluation import instance_metrics as metrics_lib
 from official.vision.losses import maskrcnn_losses
 from official.vision.modeling import factory
+import models.med_instance_segmentation.data_decoder as mfis_via_decoder
 
 
 def zero_out_disallowed_class_ids(batch_class_ids: tf.Tensor,
@@ -148,8 +148,8 @@ class MaskRCNNTask(base_task.Task):
           include_mask=self._task_config.model.include_mask,
           regenerate_source_id=decoder_cfg.regenerate_source_id,
           mask_binarize_threshold=decoder_cfg.mask_binarize_threshold)
-    elif params.decoder.type == 'via_decoder':
-      decoder = via_decoder.ViaDecoder(
+    elif params.decoder.type == 'mfis_via_decoder':
+      decoder = mfis_via_decoder.MFISVIADecoder(
           data_subset_dir=os.path.split(params.input_path)[0],
           class_names=decoder_cfg.class_names,
           include_mask=self._task_config.model.include_mask,
