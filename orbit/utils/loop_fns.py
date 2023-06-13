@@ -72,6 +72,8 @@ def create_loop_fn(step_fn):
       # async remote eager, we need to wrap the loop body in `async_scope`.
       with tf.experimental.async_scope():
         while num_steps == -1 or step < num_steps:
+          print(step_fn)
+          print(iterator)
           outputs = step_fn(iterator)
           if reduce_fn is not None:
             state = reduce_fn(state, outputs)
