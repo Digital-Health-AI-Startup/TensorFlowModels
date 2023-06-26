@@ -149,8 +149,7 @@ class TfExampleDecoder(decoder.Decoder):
             [None, None, None].
         - groundtruth_instance_masks_png: a string tensor of shape [None].
     """
-    parsed_tensors = tf.io.parse_single_example(
-        serialized=serialized_example, features=self._keys_to_features)
+    parsed_tensors = tf.io.parse_single_example(serialized=serialized_example, features=self._keys_to_features)
     for k in parsed_tensors:
       if isinstance(parsed_tensors[k], tf.SparseTensor):
         if parsed_tensors[k].dtype == tf.string:

@@ -36,6 +36,7 @@ from official.vision.evaluation import coco_utils
 from official.vision.evaluation import instance_metrics as metrics_lib
 from official.vision.losses import maskrcnn_losses
 from official.vision.modeling import factory
+from models.med_form_instance_segmentation import mfis
 
 
 def zero_out_disallowed_class_ids(batch_class_ids: tf.Tensor,
@@ -147,6 +148,12 @@ class MaskRCNNTask(base_task.Task):
           include_mask=self._task_config.model.include_mask,
           regenerate_source_id=decoder_cfg.regenerate_source_id,
           mask_binarize_threshold=decoder_cfg.mask_binarize_threshold)
+    elif params.decoder.type == 'mfis_via_decoder':
+      decoder = mfis.MFISVIADecoder(
+          data_subset_dir=os.path.split(params.input_path)[0],
+          class_names=decoder_cfg.class_names,
+          include_mask=self._task_config.model.include_mask,
+          preprocess=decoder_cfg.preprocess)
     else:
       raise ValueError('Unknown decoder type: {}!'.format(params.decoder.type))
 

@@ -40,6 +40,12 @@ class TfExampleDecoderLabelMap(hyperparams.Config):
 
 
 @dataclasses.dataclass
+class MFISVIADecoder(hyperparams.Config):
+  class_names: [str] = None
+  preprocess: bool = True
+
+
+@dataclasses.dataclass
 class DataDecoder(hyperparams.OneOfConfig):
   """Data decoder config.
 
@@ -47,10 +53,12 @@ class DataDecoder(hyperparams.OneOfConfig):
     type: 'str', type of data decoder be used, one of the fields below.
     simple_decoder: simple TF Example decoder config.
     label_map_decoder: TF Example decoder with label map config.
+    mfis_via_decoder: Medication form instance segmentation decoder from VGG image annotation dataset
   """
   type: Optional[str] = 'simple_decoder'
   simple_decoder: TfExampleDecoder = TfExampleDecoder()
   label_map_decoder: TfExampleDecoderLabelMap = TfExampleDecoderLabelMap()
+  mfis_via_decoder: MFISVIADecoder = MFISVIADecoder()
 
 
 @dataclasses.dataclass

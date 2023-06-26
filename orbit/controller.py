@@ -208,9 +208,7 @@ class Controller:
     self.global_step = global_step
     self.checkpoint_manager = checkpoint_manager
     self._enable_async_checkpoint_saving = enable_async_checkpointing
-    self._checkpoint_options = tf.train.CheckpointOptions(
-        enable_async=enable_async_checkpointing
-    )
+    self._checkpoint_options = tf.train.CheckpointOptions()
 
     if self.trainer is not None:
       self.step_timer = None
@@ -563,7 +561,6 @@ class Controller:
     # pylint: disable=protected-access
     if self.checkpoint_manager:
       logging.info("Sync on async checkpoint saving.")
-      self.checkpoint_manager.sync()
 
 
 class StepTimer:
