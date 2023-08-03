@@ -36,7 +36,7 @@ from official.vision.evaluation import coco_utils
 from official.vision.evaluation import instance_metrics as metrics_lib
 from official.vision.losses import maskrcnn_losses
 from official.vision.modeling import factory
-from models.med_form_instance_segmentation import mfis
+from models.pill_form_instance_segmentation import pfis
 
 
 def zero_out_disallowed_class_ids(batch_class_ids: tf.Tensor,
