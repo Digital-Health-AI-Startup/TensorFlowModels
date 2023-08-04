@@ -15,7 +15,7 @@
 """YT8M prediction model definition."""
 
 import functools
-from typing import Any
+from typing import Any, Optional
 
 from absl import logging
 import tensorflow as tf
@@ -43,12 +43,12 @@ class VideoClassificationModel(tf.keras.Model):
   def __init__(
       self,
       params: yt8m_cfg.VideoClassificationModel,
-      backbone: tf.keras.Model | None = None,
+      backbone: Optional[tf.keras.Model] = None,
       num_classes: int = 3862,
       input_specs: layers.InputSpec = layers.InputSpec(
           shape=[None, None, 1152]
       ),
-      l2_weight_decay: float | None = None,
+      l2_weight_decay: Optional[float] = None,
       **kwargs,
   ):
     """YT8M video classification model initialization function.
@@ -118,9 +118,6 @@ class VideoClassificationModel(tf.keras.Model):
         else None
     )
     self.head = aggregation_head(
-        input_specs=layers.InputSpec(
-            shape=[None, self._params.backbone.get().hidden_size]
-        ),
         vocab_size=self._num_classes,
         l2_regularizer=l2_regularizer,
         **head_cfg.as_dict(),
@@ -134,10 +131,17 @@ class VideoClassificationModel(tf.keras.Model):
     return cls(**config)
 
   def call(
-      self, inputs: tf.Tensor, training: Any = None, mask: Any = None
+      self,
+      inputs: tf.Tensor,
+      num_frames: Any = None,
+      training: Any = None,
   ) -> dict[str, tf.Tensor]:
-    features = self.backbone(inputs)
-    outputs = self.head(features)
+    features = self.backbone(
+        inputs,
+        num_frames=num_frames,
+        training=training,
+    )
+    outputs = self.head(features, training=training)
     return outputs
 
   @property
