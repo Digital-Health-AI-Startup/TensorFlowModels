@@ -56,9 +56,12 @@ class DataDecoder(hyperparams.OneOfConfig):
     mfis_via_decoder: Medication form instance segmentation decoder from VGG image annotation dataset
   """
   type: Optional[str] = 'simple_decoder'
-  simple_decoder: TfExampleDecoder = TfExampleDecoder()
-  label_map_decoder: TfExampleDecoderLabelMap = TfExampleDecoderLabelMap()
-  mfis_via_decoder: MFISVIADecoder = MFISVIADecoder()
+  simple_decoder: TfExampleDecoder = dataclasses.field(
+      default_factory=TfExampleDecoder
+  )
+  label_map_decoder: TfExampleDecoderLabelMap = dataclasses.field(
+      default_factory=TfExampleDecoderLabelMap
+  )
 
 
 @dataclasses.dataclass
@@ -114,8 +117,8 @@ class Augmentation(hyperparams.OneOfConfig):
     autoaug: AutoAugment config.
   """
   type: Optional[str] = None
-  randaug: RandAugment = RandAugment()
-  autoaug: AutoAugment = AutoAugment()
+  randaug: RandAugment = dataclasses.field(default_factory=RandAugment)
+  autoaug: AutoAugment = dataclasses.field(default_factory=AutoAugment)
 
 
 @dataclasses.dataclass
