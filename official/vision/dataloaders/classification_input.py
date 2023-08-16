@@ -23,6 +23,7 @@ from official.vision.dataloaders import parser
 from official.vision.ops import augment
 from official.vision.ops import preprocess_ops
 
+DEFAULT_IMAGE_FORMAT_FIELD_KEY = 'image/format'
 DEFAULT_IMAGE_FIELD_KEY = 'image/encoded'
 DEFAULT_LABEL_FIELD_KEY = 'image/class/label'
 
@@ -31,13 +32,18 @@ class Decoder(decoder.Decoder):
   """A tf.Example decoder for classification task."""
 
   def __init__(self,
+               image_format_field_key: str = DEFAULT_IMAGE_FORMAT_FIELD_KEY,
                image_field_key: str = DEFAULT_IMAGE_FIELD_KEY,
                label_field_key: str = DEFAULT_LABEL_FIELD_KEY,
                is_multilabel: bool = False,
                keys_to_features: Optional[Dict[str, Any]] = None):
+    self.image_format_field_key = image_format_field_key
+    self.image_field_key = image_field_key
     if not keys_to_features:
       keys_to_features = {
           image_field_key:
+              tf.io.FixedLenFeature((), tf.string, default_value=''),
+          image_format_field_key:
               tf.io.FixedLenFeature((), tf.string, default_value=''),
       }
       if is_multilabel:
@@ -51,8 +57,7 @@ class Decoder(decoder.Decoder):
     self._keys_to_features = keys_to_features
 
   def decode(self, serialized_example):
-    return tf.io.parse_single_example(serialized_example,
-                                      self._keys_to_features)
+    return tf.io.parse_single_example(serialized_example, self._keys_to_features)
 
 
 class Parser(parser.Parser):
@@ -61,6 +66,7 @@ class Parser(parser.Parser):
   def __init__(self,
                output_size: List[int],
                num_classes: float,
+               image_format_field_key: str = DEFAULT_IMAGE_FORMAT_FIELD_KEY,
                image_field_key: str = DEFAULT_IMAGE_FIELD_KEY,
                label_field_key: str = DEFAULT_LABEL_FIELD_KEY,
                decode_jpeg_only: bool = True,
@@ -114,6 +120,7 @@ class Parser(parser.Parser):
     self._aug_rand_hflip = aug_rand_hflip
     self._aug_crop = aug_crop
     self._num_classes = num_classes
+    self._image_format_field_key = image_format_field_key
     self._image_field_key = image_field_key
     if dtype == 'float32':
       self._dtype = tf.float32
@@ -186,6 +193,8 @@ class Parser(parser.Parser):
   def _parse_train_image(self, decoded_tensors):
     """Parses image data for training."""
     image_bytes = decoded_tensors[self._image_field_key]
+    image_format = decoded_tensors[self._image_format_field_key]
+
     require_decoding = (
         not tf.is_tensor(image_bytes) or image_bytes.dtype == tf.dtypes.string
     )
@@ -207,7 +216,10 @@ class Parser(parser.Parser):
     else:
       if require_decoding:
         # Decodes image.
-        image = tf.io.decode_image(image_bytes, channels=3)
+        if image_format == 'RAW':
+            image = tf.io.parse_tensor(image_bytes, out_type=tf.float32)
+        else:
+            image = tf.io.decode_image(image_bytes, channels=3, dtype=tf.float32) / 255.0
         image.set_shape([None, None, 3])
       else:
         # Already decoded image matrix
@@ -249,8 +261,7 @@ class Parser(parser.Parser):
       ).distort(image)
 
     # Normalizes image with mean and std pixel values.
-    image = preprocess_ops.normalize_image(
-        image, offset=preprocess_ops.MEAN_RGB, scale=preprocess_ops.STDDEV_RGB)
+    image = preprocess_ops.normalize_image(image)
 
     # Random erasing after the image has been normalized
     if self._random_erasing is not None:
@@ -264,6 +275,8 @@ class Parser(parser.Parser):
   def _parse_eval_image(self, decoded_tensors):
     """Parses image data for evaluation."""
     image_bytes = decoded_tensors[self._image_field_key]
+    image_format = decoded_tensors[self._image_format_field_key]
+
     require_decoding = (
         not tf.is_tensor(image_bytes) or image_bytes.dtype == tf.dtypes.string
     )
@@ -281,7 +294,10 @@ class Parser(parser.Parser):
     else:
       if require_decoding:
         # Decodes image.
-        image = tf.io.decode_image(image_bytes, channels=3)
+        if image_format == 'RAW':
+            image = tf.io.parse_tensor(image_bytes, out_type=tf.float32)
+        else:
+            image = tf.io.decode_image(image_bytes, channels=3, dtype=tf.float32) / 255.0
         image.set_shape([None, None, 3])
       else:
         # Already decoded image matrix
@@ -297,8 +313,7 @@ class Parser(parser.Parser):
     image.set_shape([self._output_size[0], self._output_size[1], 3])
 
     # Normalizes image with mean and std pixel values.
-    image = preprocess_ops.normalize_image(
-        image, offset=preprocess_ops.MEAN_RGB, scale=preprocess_ops.STDDEV_RGB)
+    image = preprocess_ops.normalize_image(image)
 
     # Convert image to self._dtype.
     image = tf.image.convert_image_dtype(image, self._dtype)
