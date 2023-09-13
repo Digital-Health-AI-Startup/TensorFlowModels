@@ -231,6 +231,7 @@ class Pix2Seq(tf.keras.Model):
       max_seq_len,
       vocab_size,
       hidden_size,
+      num_heads,
       num_encoder_layers=6,
       num_decoder_layers=6,
       drop_path=0.1,
@@ -246,6 +247,7 @@ class Pix2Seq(tf.keras.Model):
     self._max_seq_len = max_seq_len
     self._vocab_size = vocab_size
     self._hidden_size = hidden_size
+    self._num_heads = num_heads
     self._num_encoder_layers = num_encoder_layers
     self._num_decoder_layers = num_decoder_layers
     self._drop_path = drop_path
@@ -272,6 +274,7 @@ class Pix2Seq(tf.keras.Model):
         drop_path=self._drop_path,
         drop_units=self._drop_units,
         drop_att=self._drop_att,
+        num_heads=self._num_heads,
     )
     self._top_k = top_k
     self._top_p = top_p
@@ -298,6 +301,7 @@ class Pix2Seq(tf.keras.Model):
         "drop_att": self._drop_att,
         "top_k": self._top_k,
         "top_p": self._top_p,
+        "num_heads": self._num_heads,
     }
 
   @classmethod
@@ -331,6 +335,7 @@ class Pix2Seq(tf.keras.Model):
       inputs: tf.Tensor,
       targets: Optional[tf.Tensor] = None,
       training: bool = None,
+      use_teacher_forcing_for_eval: bool = False
   ) -> List[Any]:
     features = self._backbone(inputs)[self._backbone_endpoint_name]
     mask = tf.ones_like(features)
@@ -346,22 +351,18 @@ class Pix2Seq(tf.keras.Model):
     pos_emb = tf.cast(pos_emb, features.dtype)
 
     tokens = None
+    inputs = {
+        "inputs": features,
+        "tokens": targets,
+        "pos_emb": pos_emb,
+    }
     if training:
-      logits = self._transformer(
-          {
-              "inputs": features,
-              "tokens": targets,
-              "pos_emb": pos_emb,
-          },
-          training,
-      )
+      logits = self._transformer(inputs, training=True)
+    elif use_teacher_forcing_for_eval:
+      logits = self._transformer(inputs, training=False)
     else:
       tokens, logits = self._transformer.infer(
-          {
-              "inputs": features,
-              "tokens": targets,
-              "pos_emb": pos_emb,
-          },
+          inputs,
           top_k=self._top_k,
           top_p=self._top_p,
       )
@@ -626,7 +627,10 @@ class Pix2SeqTransformer(tf.keras.layers.Layer):
       del caches
       del tokens
       del logits
-      return tf.less(step, seq_len - 1)
+      return tf.logical_and(
+          tf.greater(seq_len, prompt_len),
+          tf.less(step, seq_len - 1)
+      )
 
     caches_var = tf.zeros(
         [seq_len-1, self._num_decoder_layers, bsz, self._hidden_size])
@@ -641,12 +645,12 @@ class Pix2SeqTransformer(tf.keras.layers.Layer):
     step, caches_var, tokens_var, logits_var = loop_body(
         step, caches_var, tokens_var, logits_var, is_prompt=True
     )
-    if seq_len > prompt_len:
-      step, caches_var, tokens_var, logits_var = tf.while_loop(
-          cond=cond,
-          body=loop_body,
-          loop_vars=[step, caches_var, tokens_var, logits_var]
-      )
+
+    _, _, tokens_var, logits_var = tf.while_loop(
+        cond=cond,
+        body=loop_body,
+        loop_vars=[step, caches_var, tokens_var, logits_var]
+    )
 
     sampled_tokens = tf.transpose(tokens_var[prompt_len:], [1, 0])
     sampled_tokens_logits = tf.transpose(logits_var[prompt_len:], [1, 0, 2])
